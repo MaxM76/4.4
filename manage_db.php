@@ -1,5 +1,8 @@
 <?php
 
+$action = 'show';
+
+
 require_once __DIR__ . '/connect_db.php';
 
 if (isset($_GET['action'])) {
@@ -10,17 +13,90 @@ if (isset($_GET['action'])) {
 
 switch ($action) {
     case 'table_info':
+        if (isset($_GET['selected_table'])) {
+            $nameSelectedTable = (string) $_GET['selected_table'];
+            try {
+                $query = "SHOW COLUMNS FROM books";
 
+                $cat = $pdo->prepare($query);
+                $cat->execute([':nameSelectedTable' => $nameSelectedTable]);
+                $tableFields = $cat->fetchAll(PDO::FETCH_ASSOC);
+                var_dump($tableFields);
+                echo '<pre>';
+                print_r($tableFields);
+                echo '</pre>';
+            } catch (PDOException $e) {
+                echo 'Ошибка выполнения запроса: ' . $e->getMessage();
+            }
+        } else {
+            $action = 'show';
+        }
         break;
     case 'create_table':
-
+        if (isset($_GET['table_name'])) {
+            $nameNewTable = (string) $_GET['table_name'];
+            try {
+                $query =  "CREATE TABLE new (`id` INT NOT NULL AUTO_INCREMENT,
+                           PRIMARY KEY(`id`))
+                            ENGINE=InnoDB, DEFAULT CHARACTER SET=utf8";
+                $cat = $pdo->prepare($query);
+                $cat->execute([':tableName' => $nameNewTable]);
+            } catch (PDOException $e) {
+                echo 'Ошибка выполнения запроса: ' . $e->getMessage();
+            }
+        } else {
+            $action = 'show';
+        }
         break;
     case 'add_field':
+        if (isset($_GET['field_name'])) {
+            $nameNewField = (string) $_GET['field_name'];
+            $typeNewField = (string) $_GET['data_type'];
+            switch ($typeNewField) {
+                case 'int' :
+                    $sqlDataType = 'INT';
+                    break;
+                case 'float' :
+                    $sqlDataType = 'FLOAT';
+                    break;
+                case 'timestamp' :
+                    $sqlDataType = 'TIMESTAMP';
+                    break;
+                case 'text' :
+                    $sqlDataType = 'TEXT';
+                    break;
+            }
 
+            try {
+                $query = "ALTER TABLE :nameSelectedTable ADD :nameNewField :typeNewField";
+
+                $cat = $pdo->prepare($query);
+                $cat->execute([':nameSelectedTable' => $nameSelectedTable, ':nameNewField' => $typeNewField]);
+
+            } catch (PDOException $e) {
+                echo 'Ошибка выполнения запроса: ' . $e->getMessage();
+            }
+        } else {
+            $action = 'show';
+        }
         break;
     case 'delete_field':
+        if (isset($_GET['selected_field'])) {
+            $nameSelectedField = (string) $_GET['selected_field'];
+            try {
+                $query = "ALTER TABLE :nameSelectedTable DROP COLUMN :nameSelectedField";
 
+                $cat = $pdo->prepare($query);
+                $cat->execute([':nameSelectedTable' => $nameSelectedTable, ':nameSelectedField' => $nameSelectedField]);
+
+            } catch (PDOException $e) {
+                echo 'Ошибка выполнения запроса: ' . $e->getMessage();
+            }
+        } else {
+            $action = 'show';
+        }
         break;
+
     case 'show':
 
         break;
@@ -32,43 +108,10 @@ $query =  'SHOW TABLES';
 $cat = $pdo->query($query);
 
 try {
-    $tables = $cat->fetchAll();
+    $dbTables = $cat->fetchAll(PDO::FETCH_NUM);
 } catch (PDOException $e) {
     echo 'Ошибка выполнения запроса: ' . $e->getMessage();
 }
-
-
-
-$query =  'CREATE DATABASE db_name';
-$cat = $pdo->query($query);
-
-try {
-
-} catch (PDOException $e) {
-    echo 'Ошибка выполнения запроса: ' . $e->getMessage();
-}
-
-
-try {
-    $query =  'CREATE DATABASE :dbName';
-    $cat = $pdo->prepare($query);
-    $cat->execute([:dbName]=>$dbName);
-
-} catch (PDOException $e) {
-    echo 'Ошибка выполнения запроса: ' . $e->getMessage();
-}
-
-
-
-try {
-    $query =  'CREATE DATABASE :dbName';
-    $cat = $pdo->prepare($query);
-    $cat->execute([:dbName]=>$dbName);
-
-} catch (PDOException $e) {
-    echo 'Ошибка выполнения запроса: ' . $e->getMessage();
-}
-
 
 
 ?>
@@ -82,59 +125,51 @@ try {
   </head>
 
   <body>
-    <p>База данных</p>
-
+    <p>База данных <?= $nameDB ?></p>
 
     <form method="GET">
       <fieldset>
-        <legend>Таблицы базы данных</legend>
-        <select size="<?= count($dbTables) ?> ">
-            <?php
-            foreach ($dbTables as $dbTable) {
-                echo "<option>$dbTable</option>";
-            }
-            ?>
-        </select>
-
-
-
-
-        <label>Выберите таблицу</label>
-        <button name="action" value="table_info">Показать информацию о таблице</button>
         <label>Введите имя новой таблицы: </label>
-        <input type="text" name="_name" placeholder="Имя новой таблицы" value="">
+        <input type="text" name="table_name" placeholder="Имя новой таблицы" value="">
         <button name="action" value="create_table">Создать таблицу</button>
         <br>
       </fieldset>
 
-        <fieldset>
-          <legend>Структура таблицы</legend>
-          <table>
-            <caption>Структура таблицы</caption>
-            <tr>
-              <th>Имя поля</th>
-              <th>Тип данных</th>
-            </tr>
+      <fieldset>
+        <legend>Таблицы базы данных</legend>
+        <select name="selected_table" size="<?= count($dbTables) ?>">
+        <?php
+        foreach ($dbTables as $dbTable) : ?>
+          <option value="<?=$dbTable[0]?>"><?=$dbTable[0]?></option>
+        <?php endforeach;?>
+        </select>
 
-            <tr>
-              <td>Имя поля 1</td>
-              <td>Тип данных 1</td>
-            </tr>
+        <label>Выберите таблицу</label>
+        <button name="action" value="table_info">Показать информацию о таблице</button>
+      </fieldset>
 
-            <tr>
-              <td>Имя поля 2</td>
-              <td>Тип данных 2</td>
-            </tr>
-            <tr>
-              <td>Имя поля 3</td>
-              <td>Тип данных 3</td>
-            </tr>
-            <tr>
-              <td>Имя поля 4</td>
-              <td>Тип данных 4</td>
-            </tr>
-          </table>
-        </fieldset>
+      <fieldset>
+        <legend>Структура таблицы <?= $nameSelectedTable ?></legend>
+        <table>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Null</th>
+            <th>Key</th>
+            <th>Default</th>
+            <th>Extra</th>
+          </tr>
+          <?php
+          foreach ($tableFields as $tableField) : ?>
+          <tr>
+          <?php
+          foreach ($tableField as $fieldCharacteristic) : ?>
+            <td><?=$fieldCharacteristic?></td>
+          <?php endforeach;?>
+          </tr>
+          <?php endforeach;?>
+        </table>
+      </fieldset>
 
 
       <fieldset>
@@ -142,23 +177,23 @@ try {
         <label>Введите имя поля: </label>
         <input type="text" name="field_name" placeholder="Имя поля" value=""><br>
         <label>Выберите тип данных поля</label>
-        <select>
-          <option>INT</option>
-          <option>FLOAT</option>
-          <option>TIMESTAMP</option>
-          <option>VARCHAR</option>
+        <select name="data_type">
+          <option value="int">INT</option>
+          <option value="float">FLOAT</option>
+          <option value="timestamp">TIMESTAMP</option>
+          <option value="text">TEXT</option>
         </select>
+        <br>
         <button name="action" value="add_field">Добавить поле</button>
 
       </fieldset>
       <fieldset>
         <legend>Удаление поля</legend>
-        <select>
-          <option>Поле 1</option>
-          <option>Поле 2</option>
-          <option>Поле 2</option>
-          <option>Поле 2</option>
-          <option>Поле 2</option>
+        <select name="selected_field" size="<?= count($tableFields) ?>">
+          <?php
+          foreach ($tableFields as $tableField) : ?>
+          <option value="<?=$tableField['Field']?>"><?=$tableField['Field']?></option>
+          <?php endforeach;?>
         </select>
         <!-- <input type="submit" name="delete_field" value="Удалить поле"> -->
         <button name="action" value="delete_field">Удалить</button>
